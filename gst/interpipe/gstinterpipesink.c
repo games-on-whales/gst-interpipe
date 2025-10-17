@@ -92,6 +92,8 @@ static void gst_inter_pipe_sink_intersect_listener_caps (gpointer key,
     gpointer value, gpointer user_data);
 static void gst_inter_pipe_sink_forward_event (gpointer key, gpointer value,
     gpointer user_data);
+static gboolean gst_inter_pipe_sink_query (GstInterPipeINode * iface,
+    GstQuery * query);
 
 static void gst_inter_pipe_inode_init (GstInterPipeINodeInterface * iface);
 
@@ -135,7 +137,7 @@ G_DEFINE_TYPE_WITH_CODE (GstInterPipeSink, gst_inter_pipe_sink,
         gst_inter_pipe_inode_init));
 
 static void
-gst_inter_pipe_sink_class_init (GstInterPipeSinkClass * klass)
+gst_inter_pipe_sink_class_init (GstInterPipeSinkClass *klass)
 {
   GObjectClass *gobject_class;
   GstElementClass *element_class;
@@ -181,8 +183,7 @@ gst_inter_pipe_sink_class_init (GstInterPipeSinkClass * klass)
 }
 
 static void
-gst_inter_pipe_sink_update_node_name (GstInterPipeSink * sink,
-    GParamSpec * pspec)
+gst_inter_pipe_sink_update_node_name (GstInterPipeSink *sink, GParamSpec *pspec)
 {
   GstInterPipeINode *node;
 
@@ -198,7 +199,7 @@ gst_inter_pipe_sink_update_node_name (GstInterPipeSink * sink,
 }
 
 static void
-gst_inter_pipe_sink_init (GstInterPipeSink * sink)
+gst_inter_pipe_sink_init (GstInterPipeSink *sink)
 {
   GstAppSinkCallbacks callbacks;
 
@@ -238,8 +239,8 @@ gst_inter_pipe_sink_init (GstInterPipeSink * sink)
 
 
 static void
-gst_inter_pipe_sink_set_property (GObject * object, guint prop_id,
-    const GValue * value, GParamSpec * pspec)
+gst_inter_pipe_sink_set_property (GObject *object, guint prop_id,
+    const GValue *value, GParamSpec *pspec)
 {
   GstInterPipeSink *sink;
 
@@ -261,8 +262,8 @@ gst_inter_pipe_sink_set_property (GObject * object, guint prop_id,
 }
 
 static void
-gst_inter_pipe_sink_get_property (GObject * object, guint prop_id,
-    GValue * value, GParamSpec * pspec)
+gst_inter_pipe_sink_get_property (GObject *object, guint prop_id,
+    GValue *value, GParamSpec *pspec)
 {
   GstInterPipeSink *sink;
   GHashTable *listeners;
@@ -285,7 +286,7 @@ gst_inter_pipe_sink_get_property (GObject * object, guint prop_id,
 }
 
 static void
-gst_inter_pipe_sink_finalize (GObject * object)
+gst_inter_pipe_sink_finalize (GObject *object)
 {
   GstInterPipeSink *sink;
   GstInterPipeINode *node;
@@ -340,8 +341,8 @@ gst_inter_pipe_sink_update_listener_caps (gpointer key, gpointer data,
 
 
 static gboolean
-gst_inter_pipe_sink_are_caps_compatible (GstInterPipeSink * sink,
-    GstCaps * listener_caps, GstCaps * sinkcaps)
+gst_inter_pipe_sink_are_caps_compatible (GstInterPipeSink *sink,
+    GstCaps *listener_caps, GstCaps *sinkcaps)
 {
   GstCaps *renegotiated_caps = NULL;
 
@@ -359,7 +360,7 @@ gst_inter_pipe_sink_are_caps_compatible (GstInterPipeSink * sink,
 }
 
 static GstCaps *
-gst_inter_pipe_sink_caps_intersect (GstCaps * caps1, GstCaps * caps2)
+gst_inter_pipe_sink_caps_intersect (GstCaps *caps1, GstCaps *caps2)
 {
   if (!caps1 && !caps2) {
     return NULL;
@@ -409,7 +410,7 @@ gst_inter_pipe_sink_intersect_listener_caps (gpointer key, gpointer value,
 }
 
 static GstCaps *
-gst_inter_pipe_sink_get_caps (GstBaseSink * base, GstCaps * filter)
+gst_inter_pipe_sink_get_caps (GstBaseSink *base, GstCaps *filter)
 {
   GstInterPipeSink *sink;
   GstInterPipeIListener *listener;
@@ -447,11 +448,9 @@ gst_inter_pipe_sink_get_caps (GstBaseSink * base, GstCaps * filter)
 
   /* Take into account upsream caps suggestion */
   pre_filter = sink->caps_negotiated;
-  intercept_caps =
-      gst_inter_pipe_sink_caps_intersect (pre_filter, filter);
+  intercept_caps = gst_inter_pipe_sink_caps_intersect (pre_filter, filter);
 
-  GST_INFO_OBJECT (sink, "Filtered caps: %" GST_PTR_FORMAT,
-      intercept_caps);
+  GST_INFO_OBJECT (sink, "Filtered caps: %" GST_PTR_FORMAT, intercept_caps);
 
   if (!intercept_caps || gst_caps_is_empty (intercept_caps)) {
     GST_ERROR_OBJECT (sink,
@@ -488,7 +487,7 @@ nointersection:
 }
 
 static gboolean
-gst_inter_pipe_sink_set_caps (GstBaseSink * base, GstCaps * caps)
+gst_inter_pipe_sink_set_caps (GstBaseSink *base, GstCaps *caps)
 {
   GstInterPipeSink *sink;
   GHashTable *listeners;
@@ -528,7 +527,7 @@ gst_inter_pipe_sink_set_caps (GstBaseSink * base, GstCaps * caps)
 
   g_mutex_unlock (&sink->listeners_mutex);
 
- out:
+out:
   if (ret) {
     gst_caps_replace (&sink->caps, caps);
     gst_app_sink_set_caps (GST_APP_SINK (sink), caps);
@@ -579,7 +578,7 @@ gst_inter_pipe_sink_forward_event (gpointer key, gpointer data,
 }
 
 static gboolean
-gst_inter_pipe_sink_event (GstBaseSink * base, GstEvent * event)
+gst_inter_pipe_sink_event (GstBaseSink *base, GstEvent *event)
 {
   GstInterPipeSink *sink;
   GHashTable *listeners;
@@ -747,7 +746,7 @@ out:
 }
 
 static gboolean
-gst_inter_pipe_sink_propose_allocation (GstBaseSink * base, GstQuery * query)
+gst_inter_pipe_sink_propose_allocation (GstBaseSink *base, GstQuery *query)
 {
   struct AllocQueryCtx ctx = { 0 };
   GstInterPipeSink *sink;
@@ -848,7 +847,7 @@ gst_inter_pipe_sink_push_to_listener (gpointer key, gpointer data,
 }
 
 static void
-gst_inter_pipe_sink_process_sample (GstInterPipeSink * sink, GstSample * sample)
+gst_inter_pipe_sink_process_sample (GstInterPipeSink *sink, GstSample *sample)
 {
   GHashTable *listeners;
   GstBuffer *buffer;
@@ -875,7 +874,7 @@ gst_inter_pipe_sink_process_sample (GstInterPipeSink * sink, GstSample * sample)
 }
 
 static GstFlowReturn
-gst_inter_pipe_sink_new_buffer (GstAppSink * asink, gpointer data)
+gst_inter_pipe_sink_new_buffer (GstAppSink *asink, gpointer data)
 {
   GstInterPipeSink *sink;
   GstSample *sample;
@@ -890,7 +889,7 @@ gst_inter_pipe_sink_new_buffer (GstAppSink * asink, gpointer data)
 
 
 static GstFlowReturn
-gst_inter_pipe_sink_new_preroll (GstAppSink * asink, gpointer data)
+gst_inter_pipe_sink_new_preroll (GstAppSink *asink, gpointer data)
 {
   GstInterPipeSink *sink;
   GstSample *sample;
@@ -920,7 +919,7 @@ gst_inter_pipe_sink_send_eos (gpointer key, gpointer data, gpointer user_data)
 }
 
 static void
-gst_inter_pipe_sink_eos (GstAppSink * asink, gpointer data)
+gst_inter_pipe_sink_eos (GstAppSink *asink, gpointer data)
 {
   GstInterPipeSink *sink;
   GHashTable *listeners;
@@ -943,16 +942,17 @@ gst_inter_pipe_sink_eos (GstAppSink * asink, gpointer data)
 
 /* GstInterPipeINode interface implementation */
 static void
-gst_inter_pipe_inode_init (GstInterPipeINodeInterface * iface)
+gst_inter_pipe_inode_init (GstInterPipeINodeInterface *iface)
 {
   iface->add_listener = gst_inter_pipe_sink_add_listener;
   iface->remove_listener = gst_inter_pipe_sink_remove_listener;
   iface->receive_event = gst_inter_pipe_sink_receive_event;
+  iface->query = gst_inter_pipe_sink_query;
 }
 
 static gboolean
-gst_inter_pipe_sink_add_listener (GstInterPipeINode * iface,
-    GstInterPipeIListener * listener)
+gst_inter_pipe_sink_add_listener (GstInterPipeINode *iface,
+    GstInterPipeIListener *listener)
 {
   GstInterPipeSink *sink;
   GHashTable *listeners;
@@ -1070,8 +1070,8 @@ error:
 }
 
 static gboolean
-gst_inter_pipe_sink_remove_listener (GstInterPipeINode * iface,
-    GstInterPipeIListener * listener)
+gst_inter_pipe_sink_remove_listener (GstInterPipeINode *iface,
+    GstInterPipeIListener *listener)
 {
   GstInterPipeSink *sink;
   GHashTable *listeners;
@@ -1106,7 +1106,7 @@ not_registered:
 }
 
 static gboolean
-gst_inter_pipe_sink_receive_event (GstInterPipeINode * iface, GstEvent * event)
+gst_inter_pipe_sink_receive_event (GstInterPipeINode *iface, GstEvent *event)
 {
   GstInterPipeSink *self;
   GHashTable *listeners;
@@ -1129,4 +1129,17 @@ multiple_listeners:
         "more than one listener is connected");
     return FALSE;
   }
+}
+
+static gboolean
+gst_inter_pipe_sink_query (GstInterPipeINode *iface, GstQuery *query)
+{
+  GstInterPipeSink *self = GST_INTER_PIPE_SINK (iface);
+  gboolean res;
+
+  GST_DEBUG_OBJECT (self, "query: %" GST_PTR_FORMAT, query);
+
+  res = gst_pad_peer_query (GST_INTER_PIPE_SINK_PAD (self), query);
+  return res;
+
 }

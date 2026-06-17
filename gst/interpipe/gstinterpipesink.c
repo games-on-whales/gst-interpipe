@@ -76,6 +76,8 @@ static gboolean gst_inter_pipe_sink_remove_listener (GstInterPipeINode * iface,
     GstInterPipeIListener * listener);
 static gboolean gst_inter_pipe_sink_receive_event (GstInterPipeINode * iface,
     GstEvent * event);
+static gboolean gst_inter_pipe_sink_receive_query (GstInterPipeINode * iface,
+    GstQuery * query);
 static GstCaps *gst_inter_pipe_sink_get_caps (GstBaseSink * base,
     GstCaps * filter);
 static gboolean gst_inter_pipe_sink_set_caps (GstBaseSink * base,
@@ -948,6 +950,7 @@ gst_inter_pipe_inode_init (GstInterPipeINodeInterface * iface)
   iface->add_listener = gst_inter_pipe_sink_add_listener;
   iface->remove_listener = gst_inter_pipe_sink_remove_listener;
   iface->receive_event = gst_inter_pipe_sink_receive_event;
+  iface->receive_query = gst_inter_pipe_sink_receive_query;
 }
 
 static gboolean
@@ -1129,4 +1132,22 @@ multiple_listeners:
         "more than one listener is connected");
     return FALSE;
   }
+}
+
+static gboolean
+gst_inter_pipe_sink_receive_query (GstInterPipeINode * iface, GstQuery * query)
+{
+  GstInterPipeSink *self;
+  GstPad *sinkpad;
+
+  self = GST_INTER_PIPE_SINK (iface);
+  sinkpad = GST_INTER_PIPE_SINK_PAD (self);
+
+  /* Run the query against our upstream peer so it can be answered by the
+   * producer pipeline. Unlike events, a read-only query (e.g. a context
+   * query) can safely be served even with multiple listeners connected, since
+   * every listener shares this same single upstream. */
+  GST_LOG_OBJECT (self, "Forwarding %s query upstream",
+      GST_QUERY_TYPE_NAME (query));
+  return gst_pad_peer_query (sinkpad, query);
 }

@@ -67,6 +67,7 @@ static void gst_inter_pipe_src_set_property (GObject * object, guint prop_id,
     const GValue * value, GParamSpec * pspec);
 static void gst_inter_pipe_src_get_property (GObject * object, guint prop_id,
     GValue * value, GParamSpec * pspec);
+static void gst_inter_pipe_src_dispose (GObject * object);
 static void gst_inter_pipe_src_finalize (GObject * object);
 static GstFlowReturn gst_inter_pipe_src_create (GstBaseSrc * base,
     guint64 offset, guint size, GstBuffer ** buf);
@@ -190,6 +191,7 @@ gst_inter_pipe_src_class_init (GstInterPipeSrcClass * klass)
 
   gobject_class->set_property = gst_inter_pipe_src_set_property;
   gobject_class->get_property = gst_inter_pipe_src_get_property;
+  gobject_class->dispose = gst_inter_pipe_src_dispose;
   gobject_class->finalize = gst_inter_pipe_src_finalize;
 
   g_object_class_install_property (gobject_class, PROP_LISTEN_TO,
@@ -357,6 +359,16 @@ gst_inter_pipe_src_get_property (GObject * object, guint prop_id,
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
       break;
   }
+}
+
+static void
+gst_inter_pipe_src_dispose (GObject * object)
+{
+  /* A listen-to switch racing stop() can leave the source registered on a
+   * node, which would then push to freed memory. */
+  gst_inter_pipe_forget_listener (GST_INTER_PIPE_ILISTENER (object));
+
+  G_OBJECT_CLASS (gst_inter_pipe_src_parent_class)->dispose (object);
 }
 
 static void

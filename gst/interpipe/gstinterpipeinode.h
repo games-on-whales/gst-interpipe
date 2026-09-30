@@ -53,6 +53,9 @@ typedef struct _GstInterPipeINodeInterface GstInterPipeINodeInterface;
  * @remove_listener: Remove @listener from the internal list. See
  * #gst_inter_pipe_inode_remove_listener.
  *
+ * @forget_listener: Remove @listener if this exact object is in the
+ * internal list. See #gst_inter_pipe_inode_forget_listener.
+ *
  * @receive_event: Receive the upstream #GstEvent passed through
  * @event and forward it upstream. It is responsability of the node to
  * decide if the event can be forwarded or not. See
@@ -66,6 +69,7 @@ struct _GstInterPipeINodeInterface
   gboolean (* remove_listener) (GstInterPipeINode *iface, GstInterPipeIListener * listener);
   gboolean (* receive_event) (GstInterPipeINode *iface, GstEvent *event);
   gboolean (* receive_query) (GstInterPipeINode *iface, GstQuery *query);
+  void (* forget_listener) (GstInterPipeINode *iface, GstInterPipeIListener * listener);
 };
 
 /**
@@ -89,6 +93,17 @@ gboolean gst_inter_pipe_inode_add_listener (GstInterPipeINode *iface, GstInterPi
  * Returns: True if the listener was found and successfully removed, False otherwise.
  */
 gboolean gst_inter_pipe_inode_remove_listener (GstInterPipeINode *iface, GstInterPipeIListener * listener);
+
+/**
+ * gst_inter_pipe_inode_forget_listener:
+ * @self: (transfer none)(not nullable): The node.
+ * @listener: (transfer none)(not nullable): The listener going away.
+ *
+ * Removes @listener if the node holds this exact object; a different
+ * listener registered under the same name is kept.
+ */
+void gst_inter_pipe_inode_forget_listener (GstInterPipeINode * self,
+    GstInterPipeIListener * listener);
 
 /**
  * gst_inter_pipe_receive_event:

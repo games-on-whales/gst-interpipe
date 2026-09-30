@@ -93,3 +93,16 @@ gst_inter_pipe_inode_receive_query (GstInterPipeINode * self, GstQuery * query)
 
   return iface->receive_query (self, query);
 }
+
+void
+gst_inter_pipe_inode_forget_listener (GstInterPipeINode * self,
+    GstInterPipeIListener * listener)
+{
+  GstInterPipeINodeInterface *iface;
+
+  g_return_if_fail (GST_INTER_PIPE_IS_INODE (self));
+
+  iface = GST_INTER_PIPE_INODE_GET_IFACE (self);
+  if (iface->forget_listener)
+    iface->forget_listener (self, listener);
+}

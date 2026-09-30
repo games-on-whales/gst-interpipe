@@ -64,6 +64,15 @@ gboolean gst_inter_pipe_listen_node (GstInterPipeIListener * listener,
 gboolean gst_inter_pipe_leave_node (GstInterPipeIListener * listener);
 
 /**
+ * gst_inter_pipe_forget_listener:
+ * @listener: (transfer none)(not nullable): The listener going away.
+ *
+ * Removes @listener from the listeners table and from every node still
+ * holding it. Call before the listener is freed.
+ */
+void gst_inter_pipe_forget_listener (GstInterPipeIListener * listener);
+
+/**
  * gst_inter_pipe_add_node:
  * @node: (transfer full)(not nullable): The node object to register
  * @node_name:(transfer none)(not nullable): The name of the node to add

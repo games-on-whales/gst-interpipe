@@ -249,6 +249,38 @@ remove_error:
 
 }
 
+void
+gst_inter_pipe_forget_listener (GstInterPipeIListener * listener)
+{
+  GstInterPipeListenerPriv *listener_priv;
+  GHashTableIter iter;
+  gpointer node;
+  GList *nodes = NULL, *l;
+
+  g_return_if_fail (listener != NULL);
+
+  /* A newer listener may be registered under the same name. */
+  g_mutex_lock (&listeners_mutex);
+  listener_priv = g_hash_table_lookup (gst_inter_pipe_get_listeners (),
+      gst_inter_pipe_ilistener_get_name (listener));
+  if (listener_priv && listener_priv->listener == listener)
+    gst_inter_pipe_leave_listeners_table (listener);
+  g_mutex_unlock (&listeners_mutex);
+
+  /* A node can still hold the listener when the table no longer does.
+   * Nodes are collected first so no node lock is taken under nodes_mutex. */
+  g_mutex_lock (&nodes_mutex);
+  g_hash_table_iter_init (&iter, gst_inter_pipe_get_nodes ());
+  while (g_hash_table_iter_next (&iter, NULL, &node))
+    nodes = g_list_prepend (nodes, gst_object_ref (node));
+  g_mutex_unlock (&nodes_mutex);
+
+  for (l = nodes; l; l = l->next)
+    gst_inter_pipe_inode_forget_listener (GST_INTER_PIPE_INODE (l->data),
+        listener);
+  g_list_free_full (nodes, gst_object_unref);
+}
+
 gboolean
 gst_inter_pipe_leave_node (GstInterPipeIListener * listener)
 {

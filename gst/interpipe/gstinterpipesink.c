@@ -74,6 +74,8 @@ static gboolean gst_inter_pipe_sink_add_listener (GstInterPipeINode * iface,
     GstInterPipeIListener * listener);
 static gboolean gst_inter_pipe_sink_remove_listener (GstInterPipeINode * iface,
     GstInterPipeIListener * listener);
+static void gst_inter_pipe_sink_forget_listener (GstInterPipeINode * iface,
+    GstInterPipeIListener * listener);
 static gboolean gst_inter_pipe_sink_receive_event (GstInterPipeINode * iface,
     GstEvent * event);
 static gboolean gst_inter_pipe_sink_receive_query (GstInterPipeINode * iface,
@@ -949,6 +951,7 @@ gst_inter_pipe_inode_init (GstInterPipeINodeInterface * iface)
 {
   iface->add_listener = gst_inter_pipe_sink_add_listener;
   iface->remove_listener = gst_inter_pipe_sink_remove_listener;
+  iface->forget_listener = gst_inter_pipe_sink_forget_listener;
   iface->receive_event = gst_inter_pipe_sink_receive_event;
   iface->receive_query = gst_inter_pipe_sink_receive_query;
 }
@@ -957,6 +960,7 @@ static gboolean
 gst_inter_pipe_sink_add_listener (GstInterPipeINode * iface,
     GstInterPipeIListener * listener)
 {
+  GstInterPipeIListener *existing;
   GstInterPipeSink *sink;
   GHashTable *listeners;
   const gchar *listener_name;
@@ -1027,10 +1031,15 @@ gst_inter_pipe_sink_add_listener (GstInterPipeINode * iface,
 
 add_to_list:
   g_mutex_lock (&sink->listeners_mutex);
-  if (g_hash_table_contains (listeners, listener_name))
+  existing = g_hash_table_lookup (listeners, listener_name);
+  if (existing == listener)
     goto already_registered;
 
-  g_hash_table_insert (listeners, (gpointer) listener_name,
+  /* A different object under this name is a stale entry, e.g. left by a
+   * resumed stream. Replace, not insert: the key is the listener's name. */
+  if (existing)
+    GST_WARNING_OBJECT (sink, "Replacing stale listener %s", listener_name);
+  g_hash_table_replace (listeners, (gpointer) listener_name,
       (gpointer) listener);
 
   g_mutex_unlock (&sink->listeners_mutex);
@@ -1106,6 +1115,33 @@ not_registered:
     g_mutex_unlock (&sink->listeners_mutex);
     return FALSE;
   }
+}
+
+static void
+gst_inter_pipe_sink_forget_listener (GstInterPipeINode * iface,
+    GstInterPipeIListener * listener)
+{
+  GstInterPipeSink *sink;
+  GHashTable *listeners;
+  const gchar *listener_name;
+
+  sink = GST_INTER_PIPE_SINK (iface);
+  listener_name = gst_inter_pipe_ilistener_get_name (listener);
+
+  g_mutex_lock (&sink->listeners_mutex);
+  listeners = GST_INTER_PIPE_SINK_LISTENERS (sink);
+
+  /* The key is the listener's name string, freed with the listener. */
+  if (g_hash_table_lookup (listeners, listener_name) == listener) {
+    GST_WARNING_OBJECT (sink, "Dropping listener %s, freed while still "
+        "registered", listener_name);
+    g_hash_table_remove (listeners, listener_name);
+    if (0 == g_hash_table_size (listeners) && sink->caps_negotiated) {
+      gst_caps_unref (sink->caps_negotiated);
+      sink->caps_negotiated = NULL;
+    }
+  }
+  g_mutex_unlock (&sink->listeners_mutex);
 }
 
 static gboolean
